@@ -1,0 +1,74 @@
+﻿@{
+    ViewBag.Title = "Registred";
+}
+<link href="~/Content/StyleMyChat.css" rel="stylesheet" type="text/css" />
+
+    <div class="container">
+        <div class="row box-center">
+            <form class="form-horizontal box-center">
+                <h2>Регистрация</h2>
+                <div class="form-group">
+                    <label for="exampleInputLogin">Введите Логин </label>
+                    <input data-bind="value:Login" type="text" class="form-control" id="exampleInputLogin" aria-describedby="emailHelp" placeholder="Enter Login">
+                </div>
+                <div class="form-group">
+                    <label for="exampleInputPassword1">Введите Пароль</label>
+                    <input data-bind="value:Pass" type="password" class="form-control" id="exampleInputPassword1" placeholder="Password">
+                </div>
+                <div class="form-group">
+                    <label for="exampleInputPassword1">Повторите Пароль</label>
+                    <input data-bind="value:Pass2" type="password" class="form-control" id="exampleInputPassword1" placeholder="Password">
+                </div>
+                <div style="margin-left :15px">
+                    <button data-bind='click: registerClick' class="btn btn-primary">Регистрация</button>
+                    <button data-bind='click: logingClick' class="btn btn-primary">Войти</button>
+                </div>
+                
+            </form>
+        </div>
+    </div>
+
+@section scripts {
+    <script>
+
+        $(function () {
+            var chatViewModel = function () {
+                var self = this;
+                //Слушатель на заполниность полей
+                self.Login = ko.observable();
+                self.Pass = ko.observable();
+                self.Pass2 = ko.observable();
+                //Функция на нажатие кнопки
+                self.registerClick = function () {
+                    if (self.Pass().trim() == "" || self.Pass == null) {
+                        alert("Пробелы ставить не хорошо");
+                        return;
+                    }
+
+                     if (self.Pass() != self.Pass2()) {
+                         alert("Пароли не совпадают");
+                         return;
+                     }
+                     //Формирования запроса на регистрацию
+                     var locModel = { Id: 0, Login: self.Login(), Pass: self.Pass() }
+                     $.post("/User/Registred", { userViewModel: locModel }, function (data) {
+                         if (data.result.IsSuccess == true) {
+                             self.UserLogin = self.Login();
+                             location.href = "/Home/Index/";
+                         }
+                         else {
+                             alert(data.result.Message);
+                         }
+
+                     });
+                };
+                //Переход на страницу автаризации
+                self.logingClick = function () {
+                    location.href = "/User/Login/";
+                };
+            }
+
+            ko.applyBindings(new chatViewModel());
+        })
+    </script>
+}

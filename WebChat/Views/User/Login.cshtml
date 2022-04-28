@@ -1,0 +1,61 @@
+﻿
+@{
+    ViewBag.Title = "Login";
+}
+<link href="~/Content/StyleMyChat.css" rel="stylesheet" type="text/css" />
+
+<div class="container">
+    <div class="row box-center">
+        <form class="form-horizontal box-center">
+            <h2>Авторизация</h2>
+            <div class="form-group">
+                <label for="exampleInputLogin">Введите Логин </label>
+                <input data-bind="value:Login" type="text" class="form-control" id="exampleInputLogin" aria-describedby="emailHelp" placeholder="Enter Login">
+            </div>
+            <div class="form-group">
+                <label for="exampleInputPassword1">Введите Пароль</label>
+                <input data-bind="value:Pass" type="password" class="form-control" id="exampleInputPassword1" placeholder="Password">
+            </div>
+            <div style="margin-left :15px">
+                <button data-bind='click: registerClick' class="btn btn-primary">Регистрация</button>
+                <button data-bind='click: logingClick' class="btn btn-primary">Войти</button>
+            </div>
+
+        </form>
+    </div>
+ </div>
+@section scripts {
+    <script>
+                $(function () {
+                    var chatViewModel = function () {
+                        var self = this;
+                        //Слушатель полей
+                        self.Login = ko.observable();
+                        self.Pass = ko.observable();
+                        //Функция для нажатия на кнопу
+                        self.logingClick = function () {
+
+                                //Фармированя запроса на автаризацию и вход
+                                var locModel = { Id: 0, Login: self.Login(), Pass: self.Pass() }
+                                $.post("/User/Login", { userViewModel: locModel }, function (data) {
+                                    if (data.result.IsSuccess ==  false) {
+                                        alert(data.result.Message);
+                                    }
+                                    else {
+                                        self.UserLogin = self.Login();
+                                        self.UserPass = self.Pass();
+                                        location.href = "/Home/Index/";
+                                    }
+                                });
+
+                        };
+                        // Переход на страницу регистрации
+                        self.registerClick = function () {
+                            location.href = "/User/Registred/";
+                        };
+                    }
+
+                    ko.applyBindings(new chatViewModel());
+                })
+    </script>
+}

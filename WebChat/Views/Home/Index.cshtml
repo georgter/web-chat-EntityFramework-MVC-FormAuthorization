@@ -1,0 +1,228 @@
+﻿@{
+    ViewBag.Title = "Home Page";
+}
+@*<link href="~/Content/StyleMyChat.css" rel="stylesheet" type="text/css" />*@
+
+<div class="main container">
+    <div class="row">
+
+        <div class="col-1">
+            <h6>Онлайн</h6>
+            <div id=chatUsers></div>@* Отоброжения пользователей онлайн *@
+        </div>
+
+        <div class="col-6">
+            <div class="row">
+                <div id="header" class="col-7"></div> <!--Вывод тикущего пользователя -->
+                <div class="col-1">
+                    <button data-bind='click: logUot' class="btn btn-primary">Выйти</button>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-10">
+
+                    <div class="textareaForMessages" id="Chats">
+                    </div>
+                    <textarea data-bind="textInput: txtMessage" class="form-control" id="TxtMessage" rows="4" cols="50" placeholder="Введите сообщение" required="required"></textarea><!--Текстовое поле для сообщений-->
+
+                    <button data-bind="click:SendMessage" class="btn btn-primary" style="margin-top: 20px">Отправить сообщение</button><!--Кнопка отправки сообщений-->
+                </div>
+            </div>
+            <h5 style="margin-top: 5px">Сообщения чата</h5>
+            <div style="height: 300px; border:1px dotted black; overflow-y:auto">
+                <div id="chatroom"></div><!--Отоброжения сообщений для сообщений-->
+            </div>
+
+        </div>
+        <div class="col-5">
+            <h5>Параметры фильтрации</h5>
+            <div class="container">
+                <div class="row">
+                    <label class="col-sm-9"><b>Дата от</b></label>
+                    <input data-bind="textInput: dateOt" id="dateOt" type="date" />
+                    <label class="col-sm-9"><b>Дата до</b></label>
+                    <input style="margin-bottom:10px;" data-bind="value:dateDo" id="dateDo" type="date" />
+                    <button data-bind="click:filterDate" class="btn btn-primary col-sm-9">Фильтровать по датам</button>
+
+                    <select style="margin-top:20px;" id="cmbUsers" data-bind="options: cmbxUsers, optionsText: 'Login', optionsValue:'Login', value: selectedUser, optionsCaption: 'Выберите пользователя чата...'"></select>
+                    <button style="margin-top:20px;" data-bind="click:filterLogin" class="btn btn-primary col-sm-9">Фильтровать по Пользователю</button>
+
+                    <button style="margin-top:20px;" data-bind="click:filterLoginAndDate" class="btn btn-primary col-sm-9">Фильтровать по всем параметрам</button>
+
+                    <button style="margin-top:20px;" data-bind="click:filterClear" class="btn btn-primary col-sm-9">Очистка</button>
+
+                </div>
+                <div class="row">
+                    <span id="HistoryChat" style='border:10px double black;margin-top:20px;' class="col-sm-9" data-bind="html: ResultSearch">Результаты поиска</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!--Cкрытые поля -->
+    <input id="username" type="hidden"/>
+    <input id="hdId" type="hidden" />
+</div>
+
+@section scripts {
+    <script src="~/Scripts/jquery-3.4.1.min.js"></script>
+    <script src="~/Scripts/jquery.signalR-2.4.3.min.js"></script>
+    <script src="~/signalr/hubs"></script>
+    <script>
+
+        $(function() {
+            var loginViewModel = function() {
+                var self = this;
+                self.txtUserName = '@ViewBag.UserLogin';
+                self.txtMessage = '';
+
+                self.dateOt = ko.observable("");
+                self.dateDo = ko.observable("");
+
+                self.ResultSearch = ko.observable("Чат истории");
+                //Вывод пользователей из базы в список
+                self.cmbxUsers = ko.observableArray();
+                //Получения пользователя из масива
+                self.selectedUser = ko.observable();
+
+                //Подключения к хабу
+                chat = $.connection.chatHub;
+
+                chat.client.onConnected = function(id, userLogin, allUsers) {
+                    //установка в скрытое поля id
+                    $('#hdId').val(id)
+
+                    //отоброжения вошедщего имени пользователя
+                    $('#header').html('<h4>Добро пожаловать: ' + self.txtUserName + '</h4 > ')
+                    //Вывод всех пользователей онлайн
+                    for (i = 0; i < allUsers.length; i++) {
+                        AddUser(allUsers[i].ConnectionId, allUsers[i].Login);
+                    }
+
+                }
+                //Добовляем нового пользователя на странице
+                chat.client.onNewUserConnected = function(id, login) {
+                    AddUser(id, login);
+                }
+
+                // Удаляем пользователя
+                chat.client.onUserDisconnected = function(id, login) {
+                    $('#' + id).remove();
+                }
+
+
+                //Добовляем сообщения в базу
+                self.SendMessage = function() {
+                    if (self.txtMessage.trim() == "" || self.txtMessage == undefined) {
+                        alert("Введите сообщение");
+                    } else {
+
+                        chat.server.send(self.txtUserName, self.txtMessage, '@ViewBag.UserId')
+                        $('#TxtMessage').val('');
+                        self.txtMessage = '';
+                    }
+                }
+
+                // Отображение сообщений
+                chat.client.addMessage = function(login, message) {
+                    let NewMessage = message.split('~')
+                    $('#chatroom').append('<table><tr><td style="width: 16.66%;"><b>' + htmlEncode(login) + '</b>:</td><td style="style="width: 50%;"">' + htmlEncode(NewMessage[0]) + '</td><td style="width: 30%;"> ' + htmlEncode(NewMessage[1]) + '</td></tr></table>');
+                }
+                //Фильтрация по дате и вывод
+                self.filterDate = function() {
+
+                    $.post("/Home/HistoriDate",
+                        { dateOt: self.dateOt(), dateDo: self.dateDo() },
+                        function(data, textstatus) {
+                            var innerHtml = "";
+                            for (var i = 0; i < data.usr.length; i++) {
+                                innerHtml += "<div class='container'><div class='row' style='border-top: 1px solid black;'><div class='col-sm-9'>" + data.usr[i].Login + ":</div><div class='col-sm-9'><textarea>" + data.usr[i].LogMessage + "</textarea></div><div class='col-sm-9'>" + data.usr[i].LogDate + "<div></div></div>"
+                            }
+                            if (data.usr.length == 0) {
+                                innerHtml = "Данных по фильтру не найдено";
+                            }
+                            self.ResultSearch(innerHtml);
+                        });
+                }
+                //отоброжает всех пользователей в списке на фильтрацию
+                $.post("/Home/AllUser",
+                    function(data, textstatus) {
+                        self.cmbxUsers(data.usr);
+                    });
+                //Фильтрация по пользователю и вывод
+                self.filterLogin = function() {
+                    $.post("/Home/HistoriLogin",
+                        { login: self.selectedUser() },
+                        function(data, textstatus) {
+                            var innerHtml = "";
+                            for (var i = 0; i < data.usr.length; i++) {
+                                innerHtml += "<div class='container'><div class='row' style='border-top: 1px solid black;'><div class='col-sm-9'>" + data.usr[i].Login + ":</div><div class='col-sm-9'><textarea>" + data.usr[i].LogMessage + "</textarea></div><div class='col-sm-9'>" + data.usr[i].LogDate + "<div></div></div>"
+                            }
+                            if (data.usr.length == 0) {
+                                innerHtml = "Данных по фильтру не найдено";
+                            }
+                            self.ResultSearch(innerHtml);
+                        });
+                }
+                //Фильтрация по всем комбо
+                self.filterLoginAndDate = function() {
+                    $.post("/Home/HistoriAll",
+                        { dateOt: self.dateOt(), dateDo: self.dateDo(), login: self.selectedUser() },
+                        function(data, textstatus) {
+                            var innerHtml = "";
+                            for (var i = 0; i < data.usr.length; i++) {
+                                innerHtml += "<div class='container'><div class='row' style='border-top: 1px solid black;'><div class='col-sm-9'>" + data.usr[i].Login + ":</div><div class='col-sm-9'><textarea>" + data.usr[i].LogMessage + "</textarea></div><div class='col-sm-9'>" + data.usr[i].LogDate + "<div></div></div>"
+                            }
+                            if (data.usr.length == 0) {
+                                innerHtml = "Данных по фильтру не найдено";
+                            }
+                            self.ResultSearch(innerHtml);
+                        });
+                }
+                //Сброс параметров фильтрации
+                self.filterClear = function() {
+                    self.dateDo("");
+                    self.dateOt("");
+                    self.cmbxUsers([]);
+                    $.post("/Home/AllUser",
+                        function(data, textstatus) {
+                            self.cmbxUsers(data.usr);
+                        });
+                    self.ResultSearch("Чат истории");
+                }
+
+                //Кнопка выхода с чата с очиской куки и остоновкой hub для того пользователя который нажал
+                self.logUot = function() {
+                    $.connection.hub.stop();
+                    location.href = "/Home/LogUot/";
+                }
+
+            }
+
+            var vm = new loginViewModel();
+            //Запуск работы Knokout
+            ko.applyBindings(vm);
+            //Запуск работы SignalR
+            $.connection.hub.start(function() {
+                vm.done;
+                chat.server.connect('@ViewBag.UserLogin');
+            });
+
+        });
+
+        //Реализация функций AddUser
+        function AddUser(id, login) {
+
+            var userId = $('#hdId').val();
+            if (userId != id) {
+                $('#chatUsers').append('<p id ="' + id + '"><br>' + login + '</b></p>')
+            }
+        }
+
+        //Функция разбора сообщения
+        function htmlEncode(value) {
+            var encodedValue = $('<div />').text(value).html();
+            return encodedValue;
+        }
+
+    </script>
+}
